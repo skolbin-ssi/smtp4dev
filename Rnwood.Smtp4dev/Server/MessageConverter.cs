@@ -1,97 +1,97 @@
 ﻿using MimeKit;
 using Rnwood.Smtp4dev.ApiModel;
-using Rnwood.Smtp4dev.DbModel;
 using System;
-using System.Collections.Generic;
-using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using Rnwood.SmtpServer;
 
 namespace Rnwood.Smtp4dev.Server
 {
     public class MessageConverter
     {
-        public async Task<DbModel.Message> ConvertAsync(Stream messageData, string envelopeFrom, string envelopeTo)
+        public async Task<DbModel.Message> ConvertAsync(IMessage message)
         {
             string subject = "";
             string mimeParseError = null;
+            string toAddress = string.Join(", ", message.Recipients);
 
-            byte[] data = new byte[messageData.Length];
-            await messageData.ReadAsync(data, 0, data.Length);
-
-
-            bool foundHeaders = false;
-            bool foundSeparator = false;
-            using (StreamReader dataReader = new StreamReader(new MemoryStream(data)))
+            byte[] data;
+            using (Stream messageData = await message.GetData())
             {
-                while (!dataReader.EndOfStream)
+                data = new byte[messageData.Length];
+                await messageData.ReadAsync(data, 0, data.Length);
+
+
+
+                bool foundHeaders = false;
+                bool foundSeparator = false;
+                using (StreamReader dataReader = new StreamReader(new MemoryStream(data)))
                 {
-                    if (dataReader.ReadLine().Length != 0)
+                    while (!dataReader.EndOfStream)
                     {
-                        foundHeaders = true;
+                        if (dataReader.ReadLine().Length != 0)
+                        {
+                            foundHeaders = true;
+                        }
+                        else
+                        {
+                            foundSeparator = true;
+                            break;
+                        }
                     }
-                    else
+                }
+
+                if (!foundHeaders || !foundSeparator)
+                {
+                    mimeParseError = "Malformed MIME message. No headers found";
+                }
+                else
+                {
+
+                    messageData.Seek(0, SeekOrigin.Begin);
+                    try
                     {
-                        foundSeparator = true;
-                        break;
+                        CancellationTokenSource cts = new CancellationTokenSource();
+                        cts.CancelAfter(TimeSpan.FromSeconds(10));
+                        MimeMessage mime = await MimeMessage.LoadAsync(messageData, true, cts.Token).ConfigureAwait(false);
+                        subject = mime.Subject;
+
+
+                    }
+                    catch (OperationCanceledException e)
+                    {
+                        mimeParseError = e.Message;
+                    }
+                    catch (FormatException e)
+                    {
+                        mimeParseError = e.Message;
                     }
                 }
             }
 
-            if (!foundHeaders || !foundSeparator)
-            {
-                mimeParseError = "Malformed MIME message. No headers found";
-            }
-            else
-            {
-
-                messageData.Seek(0, SeekOrigin.Begin);
-                try
-                {
-                    CancellationTokenSource cts = new CancellationTokenSource();
-                    cts.CancelAfter(TimeSpan.FromSeconds(10));
-                    MimeMessage mime = await MimeMessage.LoadAsync(messageData, true, cts.Token).ConfigureAwait(false);
-                    subject = mime.Subject;
-
-
-                }
-                catch (OperationCanceledException e)
-                {
-                    mimeParseError = e.Message;
-                }
-                catch (FormatException e)
-                {
-                    mimeParseError = e.Message;
-                }
-            }
-
-
-            DbModel.Message message = new DbModel.Message()
+            DbModel.Message result = new DbModel.Message
             {
                 Id = Guid.NewGuid(),
-
-                From = PunyCodeReplacer.DecodePunycode(envelopeFrom),
-                To = PunyCodeReplacer.DecodePunycode(envelopeTo),
+                From = PunyCodeReplacer.DecodePunycode(message.From),
+                To = PunyCodeReplacer.DecodePunycode(toAddress),
                 ReceivedDate = DateTime.Now,
                 Subject = PunyCodeReplacer.DecodePunycode(subject),
                 Data = data,
                 MimeParseError = mimeParseError,
-                AttachmentCount = 0
+                AttachmentCount = 0,
+                SecureConnection = message.SecureConnection
             };
 
-            var parts = new ApiModel.Message(message).Parts;
+            var parts = new Message(result).Parts;
             foreach (var part in parts)
             {
-                message.AttachmentCount += CountAttachments(part);
+                result.AttachmentCount += CountAttachments(part);
             }
 
-
-            return message;
+            return result;
         }
-
 
         private int CountAttachments(MessageEntitySummary part)
         {

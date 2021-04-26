@@ -8,7 +8,7 @@ declare module "vue2-ace-editor" {
 
     }
 
-    var aceEditor: AceEditor;
+    const aceEditor: AceEditor;
 
     export default aceEditor;
 }
@@ -23,4 +23,9 @@ declare module "locale-index-of" {
 
 interface String {
     localeIndexOf(substring: string, locales?: string | string[] | undefined, options?: Intl.CollatorOptions | undefined): number;
+}
+
+declare module "splitpanes" {
+    export const Splitpanes: any;
+    export const Pane: any;
 }

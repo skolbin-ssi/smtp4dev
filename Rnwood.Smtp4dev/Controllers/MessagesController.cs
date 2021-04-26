@@ -16,6 +16,7 @@ using System.Linq.Dynamic.Core;
 
 using Message = Rnwood.Smtp4dev.DbModel.Message;
 using Rnwood.Smtp4dev.Server;
+using MimeKit;
 
 namespace Rnwood.Smtp4dev.Controllers
 {
@@ -24,12 +25,14 @@ namespace Rnwood.Smtp4dev.Controllers
 	[UseEtagFilterAttribute]
 	public class MessagesController : Controller
 	{
-		public MessagesController(IMessagesRepository messagesRepository)
+		public MessagesController(IMessagesRepository messagesRepository, Smtp4devServer server)
 		{
 			this.messagesRepository = messagesRepository;
+			this.server = server;
 		}
 
 		private IMessagesRepository messagesRepository;
+		private Smtp4devServer server;
 
 		[HttpGet]
 
@@ -59,13 +62,29 @@ namespace Rnwood.Smtp4dev.Controllers
 			return messagesRepository.MarkMessageRead(id);
 		}
 
-		[HttpGet("{id}/source")]
+		[HttpGet("{id}/download")]
 		[ResponseCache(Location = ResponseCacheLocation.Any, Duration = 31556926)]
 
 		public FileStreamResult DownloadMessage(Guid id)
 		{
 			Message result = GetDbMessage(id);
 			return new FileStreamResult(new MemoryStream(result.Data), "message/rfc822") { FileDownloadName = $"{id}.eml" };
+		}
+
+		[HttpPost("{id}/relay")]
+
+		public IActionResult RelayMessage(Guid id, [FromBody] MessageRelayOptions options)
+		{
+			Message message = GetDbMessage(id);
+            Dictionary<MailboxAddress, Exception> relayErrors = server.TryRelayMessage(message, options?.OverrideRecipientAddresses?.Length > 0 ? options?.OverrideRecipientAddresses.Select(a => MailboxAddress.Parse(a)).ToArray() : null);
+
+			if (relayErrors.Any())
+			{
+				string relayErrorSummary = string.Join(". ", relayErrors.Select(e => e.Key.Address + ": " + e.Value.Message));
+				return Problem("Failed to relay to recipients: " + relayErrorSummary);
+			}
+
+			return Ok();
 		}
 
 		[HttpGet("{id}/part/{partid}/content")]
@@ -87,6 +106,22 @@ namespace Rnwood.Smtp4dev.Controllers
 		public string GetPartSourceRaw(Guid id, string partid)
 		{
 			return ApiModel.Message.GetPartSource(GetMessage(id), partid);
+		}
+
+		[HttpGet("{id}/raw")]
+		[ResponseCache(Location = ResponseCacheLocation.Any, Duration = 31556926)]
+		public string GetMessageSourceRaw(Guid id)
+		{
+			ApiModel.Message message = GetMessage(id);
+			return System.Text.Encoding.UTF8.GetString(message.Data);
+		}
+
+		[HttpGet("{id}/source")]
+		[ResponseCache(Location = ResponseCacheLocation.Any, Duration = 31556926)]
+		public string GetMessageSource(Guid id)
+		{
+			ApiModel.Message message = GetMessage(id);
+			return message.MimeMessage.ToString();
 		}
 
 		[HttpGet("{id}/html")]

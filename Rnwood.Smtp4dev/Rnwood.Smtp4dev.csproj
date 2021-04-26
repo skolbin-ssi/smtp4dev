@@ -13,25 +13,35 @@
 		<PackAsTool>true</PackAsTool>
 		<ToolCommandName>smtp4dev</ToolCommandName>
 		<PackageOutputPath>./bin/pkg</PackageOutputPath>
+		<PackageLicenseExpression>BSD-3-Clause</PackageLicenseExpression>
 	</PropertyGroup>
 	<PropertyGroup Condition="'$(Configuration)'==''">
 		<Configuration>Debug</Configuration>
 	</PropertyGroup>
 
 	<ItemGroup>
-		<PackageReference Include="HtmlAgilityPack" Version="1.11.24" />
-		<PackageReference Include="Microsoft.AspNetCore.Hosting.WindowsServices" Version="3.1.5" />
+		<PackageReference Include="CommandLiners.MonoOptions" Version="1.0.36" />
+		<PackageReference Include="HtmlAgilityPack" Version="1.11.33" />
+		<PackageReference Include="MailKit" Version="2.11.1" />
+		<PackageReference Include="Microsoft.AspNetCore.Hosting.WindowsServices" Version="3.1.14" />
 		<PackageReference Include="Microsoft.AspNetCore.SignalR" Version="1.1.0" />
 		<PackageReference Include="Microsoft.AspNetCore.SignalR.Core" Version="1.1.0" />
 		<PackageReference Include="Microsoft.AspNetCore.StaticFiles" Version="2.2.0" />
-		<PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="3.1.3" />
-		<PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="3.1.3" />
-		<PackageReference Include="MimeKit" Version="2.6.0" />
-		<PackageReference Include="Rnwood.SmtpServer" Version="3.1.0-ci0579" />
-		<PackageReference Include="Portable.BouncyCastle" Version="1.8.6.7" />
-		<PackageReference Include="System.Data.SQLite" Version="1.0.113.1" />
-		<PackageReference Include="System.Linq.Dynamic.Core" Version="1.1.7" />
-		<PackageReference Include="VueCliMiddleware" Version="3.1.1" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="3.1.13">
+		  <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+		  <PrivateAssets>all</PrivateAssets>
+		</PackageReference>
+		<PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="3.1.13" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="3.1.13" />
+		<PackageReference Include="MimeKit" Version="2.11.0" />
+		<PackageReference Include="Mono.Options" Version="6.6.0.161" />
+		<PackageReference Include="New.LumiSoft.Net" Version="1.0.0" />
+		<PackageReference Include="Rnwood.SmtpServer" Version="3.1.0-ci0648" />
+		<PackageReference Include="Portable.BouncyCastle" Version="1.8.10" />
+		<PackageReference Include="System.Data.SQLite" Version="1.0.113.7" />
+		<PackageReference Include="System.Linq.Dynamic.Core" Version="1.2.9" />
+		<PackageReference Include="System.Reactive" Version="4.4.1" />
+		<PackageReference Include="VueCliMiddleware" Version="3.1.2" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -66,6 +76,42 @@
 		<None Update="ClientApp\ApiClient\SessionSummary.ts">
 			<CustomToolNamespace>ApiModel\SessionSummary.cs</CustomToolNamespace>
 		</None>
+		<None Update="ClientApp\src\ApiClient\AttachmentSummary.ts">
+		  <CustomToolNamespace>ApiModel\AttachmentSummary.cs</CustomToolNamespace>
+		</None>
+		<None Update="ClientApp\src\ApiClient\Header.ts">
+		  <CustomToolNamespace>ApiModel\Header.cs</CustomToolNamespace>
+		</None>
+		<None Update="ClientApp\src\ApiClient\HomeController.ts">
+		  <CustomToolNamespace>Controllers\HomeController.cs</CustomToolNamespace>
+		</None>
+		<None Update="ClientApp\src\ApiClient\Message.ts">
+		  <CustomToolNamespace>ApiModel\Message.cs</CustomToolNamespace>
+		</None>
+		<None Update="ClientApp\src\ApiClient\MessageEntitySummary.ts">
+		  <CustomToolNamespace>ApiModel\MessageEntitySummary.cs</CustomToolNamespace>
+		</None>
+		<None Update="ClientApp\src\ApiClient\MessagesController.ts">
+		  <CustomToolNamespace>Controllers\MessagesController.cs</CustomToolNamespace>
+		</None>
+		<None Update="ClientApp\src\ApiClient\MessageSummary.ts">
+		  <CustomToolNamespace>ApiModel\MessageSummary.cs</CustomToolNamespace>
+		</None>
+		<None Update="ClientApp\src\ApiClient\MessageWarning.ts">
+		  <CustomToolNamespace>ApiModel\MessageWarning.cs</CustomToolNamespace>
+		</None>
+		<None Update="ClientApp\src\ApiClient\MimeEntityVisitor.ts">
+		  <CustomToolNamespace>ApiModel\MimeEntityVisitor.cs</CustomToolNamespace>
+		</None>
+		<None Update="ClientApp\src\ApiClient\Session.ts">
+		  <CustomToolNamespace>ApiModel\Session.cs</CustomToolNamespace>
+		</None>
+		<None Update="ClientApp\src\ApiClient\SessionsController.ts">
+		  <CustomToolNamespace>Controllers\SessionsController.cs</CustomToolNamespace>
+		</None>
+		<None Update="ClientApp\src\ApiClient\SessionSummary.ts">
+		  <CustomToolNamespace>ApiModel\SessionSummary.cs</CustomToolNamespace>
+		</None>
 	</ItemGroup>
 
 	<ItemGroup>
@@ -77,7 +123,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<NpmInputs Include="ClientApp\package.json"/>
+		<NpmInputs Include="ClientApp\package.json" />
 	</ItemGroup>
 
 	<Target Name="NpmInstall" AfterTargets="Build" Inputs="@(NpmInputs)" Outputs="ClientApp\node_modules\.installedtimestamp" Condition="'$(SkipClientApp)'!='true'">
@@ -88,10 +134,35 @@
 
 	<PropertyGroup> 
 		<DisableFastUpToDateCheck>true</DisableFastUpToDateCheck> 
+		<UserSecretsId>166ca2db-ad20-40b7-95ab-1634e9dd4404</UserSecretsId> 
 	</PropertyGroup>
 
 	<ItemGroup>
-		<ClientApp Include="ClientApp/**"/>
+		<ClientApp Include="ClientApp/**" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <ClientApp Remove="ClientApp\src\ApiClient\MessageRelayOptions.cs" />
+	  <ClientApp Remove="ClientApp\src\ApiClient\MessageRelayOptions.ts" />
+	  <ClientApp Remove="ClientApp\src\ApiClient\Server.ts" />
+	  <ClientApp Remove="ClientApp\src\ApiClient\ServerController.ts" />
+	  <ClientApp Remove="ClientApp\src\ApiClient\ServerRelayOptions.ts" />
+	  <ClientApp Remove="ClientApp\src\components\messagesource.vue" />
+	  <ClientApp Remove="ClientApp\src\components\settingsdialog.vue" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <None Remove="ClientApp\src\ApiClient\MessageRelayOptions.ts" />
+	  <None Remove="ClientApp\src\ApiClient\Server.ts" />
+	  <None Remove="ClientApp\src\ApiClient\ServerController.ts" />
+	  <None Remove="ClientApp\src\ApiClient\ServerRelayOptions.ts" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <TypeScriptCompile Include="ClientApp\src\ApiClient\MessageRelayOptions.ts" />
+	  <TypeScriptCompile Include="ClientApp\src\ApiClient\Server.ts" />
+	  <TypeScriptCompile Include="ClientApp\src\ApiClient\ServerController.ts" />
+	  <TypeScriptCompile Include="ClientApp\src\ApiClient\ServerRelayOptions.ts" />
 	</ItemGroup>
 
 	<Target Name="DebugRunNpm" AfterTargets="Build" Inputs="@(ClientApp)" Outputs="wwwroot\.buildtimestamp" Condition="'$(SkipClientApp)'!='true'">

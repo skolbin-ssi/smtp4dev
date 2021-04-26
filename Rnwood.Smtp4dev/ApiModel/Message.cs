@@ -3,21 +3,17 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
-using Rnwood.Smtp4dev.DbModel;
-using System.Net.Http.Headers;
-using Rnwood.Smtp4dev;
+using Newtonsoft.Json;
 
 namespace Rnwood.Smtp4dev.ApiModel
 {
     public class Message : ICacheByKey
     {
 
-
         public Message(DbModel.Message dbMessage)
         {
+            Data = dbMessage.Data;
             Id = dbMessage.Id;
             From = dbMessage.From;
             To = dbMessage.To;
@@ -25,8 +21,10 @@ namespace Rnwood.Smtp4dev.ApiModel
             Bcc = "";
             ReceivedDate = dbMessage.ReceivedDate;
             Subject = dbMessage.Subject;
+            SecureConnection = dbMessage.SecureConnection;
 
             Parts = new List<ApiModel.MessageEntitySummary>();
+            RelayError = dbMessage.RelayError;
 
             if (dbMessage.MimeParseError != null)
             {
@@ -84,10 +82,9 @@ namespace Rnwood.Smtp4dev.ApiModel
 
             return MimeEntityVisitor.VisitWithResults<MessageEntitySummary>(entity, (e, p) =>
            {
-               string fileName = PunyCodeReplacer.DecodePunycode(string.IsNullOrEmpty(e.ContentType?.Name)
+               string fileName = PunyCodeReplacer.DecodePunycode(!string.IsNullOrEmpty(e.ContentDisposition?.FileName)
             ? e.ContentDisposition?.FileName
-            : e.ContentType.Name);
-
+            : e.ContentType?.Name);
 
                MessageEntitySummary result = new MessageEntitySummary()
                {
@@ -203,6 +200,8 @@ namespace Rnwood.Smtp4dev.ApiModel
         public string Cc { get; set; }
         public string Bcc { get; set; }
         public DateTime ReceivedDate { get; set; }
+        
+        public bool SecureConnection { get; set; }
 
         public string Subject { get; set; }
 
@@ -212,7 +211,11 @@ namespace Rnwood.Smtp4dev.ApiModel
 
         public string MimeParseError { get; set; }
 
+        public string RelayError { get; set; }
+
         internal MimeMessage MimeMessage { get; set; }
+
+        internal byte[] Data { get; set; }
 
         string ICacheByKey.CacheKey => Id.ToString();
     }

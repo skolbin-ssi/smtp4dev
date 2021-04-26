@@ -1,6 +1,9 @@
-﻿using System;
+﻿using Newtonsoft.Json;
+using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Net;
 using System.Threading.Tasks;
 
 namespace Rnwood.Smtp4dev.Server
@@ -15,12 +18,16 @@ namespace Rnwood.Smtp4dev.Server
         public int NumberOfMessagesToKeep { get; set; } = 100;
         public int NumberOfSessionsToKeep { get; set; } = 100;
 
-        public string RootUrl { get; set; }
+        public string BasePath { get; set; } = "/";
 
-        public TlsMode TlsMode { get; set; } = TlsMode.StartTls;
+        public TlsMode TlsMode { get; set; } = TlsMode.None;
 
         public string TlsCertificate { get; set; }
 
-        public string HostName { get; set;} = "localhost";
+        public string HostName { get; set; } = Dns.GetHostName();
+
+        public int? ImapPort { get; set; } = 143;
+
+        public bool RecreateDb { get; set; }
     }
 }

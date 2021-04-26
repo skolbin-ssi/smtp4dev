@@ -6,10 +6,10 @@
             <el-button v-on:click="loadMessage">Retry</el-button>
         </el-alert>
 
-        <div class="toolbar"><el-button size="small" @click="download">Open</el-button></div>
-        <template v-show="source" class="vfillpanel fill">
+        <div class="toolbar"><el-button size="small" icon="el-icon-document" @click="download">Open</el-button></div>
+        <div v-show="source" class="vfillpanel fill">
             <textview :text="source" class="fill"></textview>
-        </template>
+        </div>
     </div>
 </template>
 <script lang="ts">

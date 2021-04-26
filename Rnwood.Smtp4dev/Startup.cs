@@ -1,7 +1,6 @@
 using System;
 using System.IO;
-using System.Threading.Tasks;
-
+using System.Net;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
@@ -15,6 +14,8 @@ using Rnwood.Smtp4dev.Server;
 using VueCliMiddleware;
 using Microsoft.Extensions.Hosting;
 using Microsoft.AspNetCore.SpaServices;
+using MailKit.Net.Smtp;
+using Microsoft.AspNetCore.Rewrite;
 
 namespace Rnwood.Smtp4dev
 {
@@ -30,11 +31,13 @@ namespace Rnwood.Smtp4dev
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
+            services.Configure<ServerOptions>(Configuration.GetSection("ServerOptions"));
+            services.Configure<RelayOptions>(Configuration.GetSection("RelayOptions"));
+
             ServerOptions serverOptions = Configuration.GetSection("ServerOptions").Get<ServerOptions>();
 
             services.AddDbContext<Smtp4devDbContext>(opt =>
             {
-
                 if (string.IsNullOrEmpty(serverOptions.Database))
                 {
                     Console.WriteLine("Using in memory database.");
@@ -42,25 +45,48 @@ namespace Rnwood.Smtp4dev
                 }
                 else
                 {
+                    if (serverOptions.RecreateDb && File.Exists(serverOptions.Database))
+                    {
+                        Console.WriteLine("Deleting Sqlite database.");
+                        File.Delete(serverOptions.Database);
+                    }
+
                     Console.WriteLine("Using Sqlite database at " + Path.GetFullPath(serverOptions.Database));
                     opt.UseSqlite($"Data Source='{serverOptions.Database}'");
                 }
             }, ServiceLifetime.Transient, ServiceLifetime.Singleton);
 
             services.AddSingleton<Smtp4devServer>();
+            services.AddSingleton<ImapServer>();
             services.AddSingleton<IMessagesRepository>(sp => sp.GetService<Smtp4devServer>());
             services.AddSingleton<Func<Smtp4devDbContext>>(sp => (() => sp.GetService<Smtp4devDbContext>()));
 
-            services.Configure<ServerOptions>(Configuration.GetSection("ServerOptions"));
+            services.AddSingleton<Func<RelayOptions, SmtpClient>>((relayOptions) =>
+            {
+                if (!relayOptions.IsEnabled)
+                {
+                    return null;
+                }
+
+                SmtpClient result = new SmtpClient();
+                result.Connect(relayOptions.SmtpServer, relayOptions.SmtpPort);
+
+                if (!string.IsNullOrEmpty(relayOptions.Login))
+                {
+                    result.Authenticate(relayOptions.Login, relayOptions.Password);
+                }
+
+                return result;
+            });
+
 
             services.AddSignalR();
-
-            services.AddSingleton<MessagesHub>();
-            services.AddSingleton<SessionsHub>();
+            services.AddSingleton<NotificationsHub>();
 
             services.AddControllers();
 
             services.AddSpaStaticFiles(o => o.RootPath = "ClientApp");
+
         }
 
 
@@ -71,9 +97,9 @@ namespace Rnwood.Smtp4dev
 
             app.UseRouting();
 
-
             Action<IApplicationBuilder> configure = subdir =>
             {
+                subdir.UseRouting();
                 subdir.UseDeveloperExceptionPage();
                 subdir.UseDefaultFiles();
                 subdir.UseStaticFiles();
@@ -83,23 +109,23 @@ namespace Rnwood.Smtp4dev
 
                 subdir.UseEndpoints(e =>
                 {
-                    e.MapHub<MessagesHub>("/hubs/messages");
-                    e.MapHub<SessionsHub>("/hubs/sessions");
+                    e.MapHub<NotificationsHub>("/hubs/notifications");
 
                     e.MapControllers();
                     if (env.IsDevelopment())
                     {
                         e.MapToVueCliProxy(
                         "{*path}",
-                        new SpaOptions { SourcePath = "ClientApp" },
+                        new SpaOptions { SourcePath = Path.Join(env.ContentRootPath, "ClientApp") },
                         npmScript: "serve",
                         regex: "Compiled successfully",
-                        forceKill: true
+                        forceKill: true,
+                        port: 8123
                         );
                     }
                 });
 
-                
+
 
 
 
@@ -109,17 +135,25 @@ namespace Rnwood.Smtp4dev
                     context.Database.Migrate();
                 }
 
-                subdir.ApplicationServices.GetService<Smtp4devServer>().Start();
+                subdir.ApplicationServices.GetService<Smtp4devServer>().TryStart();
+                subdir.ApplicationServices.GetService<ImapServer>().TryStart();
             };
 
-            if (!string.IsNullOrEmpty(serverOptions.RootUrl))
+            if (!string.IsNullOrEmpty(serverOptions.BasePath) && serverOptions.BasePath != "/")
             {
-                app.Map(serverOptions.RootUrl, configure);
+                RewriteOptions rewrites = new RewriteOptions();
+                rewrites.AddRedirect("^" + serverOptions.BasePath.TrimEnd('/') + "$", serverOptions.BasePath.TrimEnd('/') + "/"); ;
+                rewrites.AddRedirect("^(/)?$", serverOptions.BasePath.TrimEnd('/') + "/"); ;
+                app.UseRewriter(rewrites);
+
+                app.Map(serverOptions.BasePath, configure);
             }
             else
             {
                 configure(app);
             }
+
+
         }
 
     }

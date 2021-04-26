@@ -14,30 +14,63 @@ namespace Rnwood.Smtp4dev.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "2.2.2-servicing-10034");
+                .HasAnnotation("ProductVersion", "3.1.9");
+
+            modelBuilder.Entity("Rnwood.Smtp4dev.DbModel.ImapState", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("LastUid")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("ImapState");
+                });
 
             modelBuilder.Entity("Rnwood.Smtp4dev.DbModel.Message", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd();
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
 
-                    b.Property<int>("AttachmentCount");
+                    b.Property<int>("AttachmentCount")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<byte[]>("Data");
+                    b.Property<byte[]>("Data")
+                        .HasColumnType("BLOB");
 
-                    b.Property<string>("From");
+                    b.Property<string>("From")
+                        .HasColumnType("TEXT");
 
-                    b.Property<bool>("IsUnread");
+                    b.Property<long>("ImapUid")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<string>("MimeParseError");
+                    b.Property<bool>("IsUnread")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<DateTime>("ReceivedDate");
+                    b.Property<string>("MimeParseError")
+                        .HasColumnType("TEXT");
 
-                    b.Property<Guid?>("SessionId");
+                    b.Property<DateTime>("ReceivedDate")
+                        .HasColumnType("TEXT");
 
-                    b.Property<string>("Subject");
+                    b.Property<string>("RelayError")
+                        .HasColumnType("TEXT");
 
-                    b.Property<string>("To");
+                    b.Property<bool>("SecureConnection")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid?>("SessionId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Subject")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("To")
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -49,23 +82,32 @@ namespace Rnwood.Smtp4dev.Migrations
             modelBuilder.Entity("Rnwood.Smtp4dev.DbModel.Session", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd();
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
 
-                    b.Property<string>("ClientAddress");
+                    b.Property<string>("ClientAddress")
+                        .HasColumnType("TEXT");
 
-                    b.Property<string>("ClientName");
+                    b.Property<string>("ClientName")
+                        .HasColumnType("TEXT");
 
-                    b.Property<DateTime?>("EndDate");
+                    b.Property<DateTime?>("EndDate")
+                        .HasColumnType("TEXT");
 
-                    b.Property<string>("Log");
+                    b.Property<string>("Log")
+                        .HasColumnType("TEXT");
 
-                    b.Property<int>("NumberOfMessages");
+                    b.Property<int>("NumberOfMessages")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<string>("SessionError");
+                    b.Property<string>("SessionError")
+                        .HasColumnType("TEXT");
 
-                    b.Property<int?>("SessionErrorType");
+                    b.Property<int?>("SessionErrorType")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<DateTime>("StartDate");
+                    b.Property<DateTime>("StartDate")
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 

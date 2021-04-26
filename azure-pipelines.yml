@@ -1,25 +1,50 @@
-name: $(version)-ci$(Date:yyyyMMdd)$(Rev:rr)
 trigger:
-- master
+  branches:
+    include:
+      - master
+      - refs/tags/*.*.*
+      - refs/tags/*.*.*.*
+    exclude:
+      - refs/tags/*-ci*
 
 resources:
 - repo: self
 
 variables:
-  version_major: '3'
-  version_minor: '1'
-  version_release: '1'
-  version_majorminor: '$(version_major).$(version_minor)'
-  version: '$(version_major).$(version_minor).$(version_release)'
-  tag: '$(Build.BuildNumber)'
+  ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/master') }}:
+    iscibuild: ${{ true }}
+    docker_tags: 'prerelease'
+
+  ${{ if startsWith(variables['Build.SourceBranch'], 'refs/tags/') }}:
+    isreleasebuild: ${{ true }}
+    tag: $[ replace(variables['Build.SourceBranch'], 'refs/tags/', '') ]
+    docker_tags: 'v3 v3.1 latest'
+
+  ${{ if not(startsWith(variables['Build.SourceBranch'], 'refs/tags/')) }}:
+    civersion: '3.1.3'
+    tag: $[ format('$(civersion)-ci{0:yyyyMMdd}{1}', pipeline.startTime, counter(format('{0:yyyyMMdd}', pipeline.startTime), 100)) ]
+
   docker_repo: 'rnwood/smtp4dev'
-  docker_tag_suffix: 'v$(version_major)'
   docker_registry: 'dockerhub-rnwood'
   netcoresdk_version: '3.1.102'
 
 stages:
+- stage: Init
+  displayName: Init
+  jobs:
+  - job: Init
+    pool:
+      vmImage: 'ubuntu-18.04'
+    steps:
+    - checkout: none    
+    - powershell: Write-Host "$(tag) $(Build.BuildNumber)"
+      displayName: Display build number
+    - powershell: Write-Host "##vso[build.updatebuildnumber]$(tag) $(Build.BuildNumber)" 
+      displayName: Update build number
+
 - stage: Build
   displayName: Build
+  condition: succeeded()
   jobs:
 
   - job: Build
@@ -37,7 +62,7 @@ stages:
       inputs:
         command: custom
         custom: pack
-        arguments: '-c Release -p:PackAsTool=true -p:version=$(Build.BuildNumber) -o "$(Build.ArtifactStagingDirectory)/dotnetglobaltool" Rnwood.Smtp4dev/Rnwood.Smtp4dev.csproj'
+        arguments: '-c Release -p:PackAsTool=true -p:version=$(tag) -o "$(Build.ArtifactStagingDirectory)/dotnetglobaltool" Rnwood.Smtp4dev/Rnwood.Smtp4dev.csproj'
     - publish: $(Build.ArtifactStagingDirectory)/dotnetglobaltool
       artifact: dotnetglobaltool
     - task: DotNetCoreCLI@2
@@ -45,7 +70,7 @@ stages:
       inputs:
         command: publish
         projects: Rnwood.Smtp4dev/Rnwood.Smtp4dev.csproj
-        arguments: '-c Release -p:version=$(Build.BuildNumber) -o "$(Build.ArtifactStagingDirectory)/noruntime"'
+        arguments: '-c Release -p:version=$(tag) -o "$(Build.ArtifactStagingDirectory)/noruntime"'
     - powershell: move-item $(Build.ArtifactStagingDirectory)/noruntime/Rnwood.Smtp4dev.zip $(Build.ArtifactStagingDirectory)/noruntime/Rnwood.Smtp4dev-noruntime-$(tag).zip
       displayName: Rename artifact
     - publish: $(Build.ArtifactStagingDirectory)/noruntime
@@ -55,7 +80,7 @@ stages:
       inputs:
         command: publish
         projects: Rnwood.Smtp4dev/Rnwood.Smtp4dev.csproj
-        arguments: '-c Release -r win-x64 -p:version=$(Build.BuildNumber) -o "$(Build.ArtifactStagingDirectory)/win-x64"'        
+        arguments: '-c Release -r win-x64 -p:version=$(tag) -o "$(Build.ArtifactStagingDirectory)/win-x64"'        
     - powershell: move-item $(Build.ArtifactStagingDirectory)/win-x64/Rnwood.Smtp4dev.zip $(Build.ArtifactStagingDirectory)/win-x64/Rnwood.Smtp4dev-win-x64-$(tag).zip
       displayName: Rename artifact        
     - publish: $(Build.ArtifactStagingDirectory)/win-x64
@@ -65,27 +90,39 @@ stages:
       inputs:
         command: publish
         projects: Rnwood.Smtp4dev/Rnwood.Smtp4dev.csproj
-        arguments: '-c Release -r linux-x64 -p:version=$(Build.BuildNumber)  -o "$(Build.ArtifactStagingDirectory)/linux-x64"' 
+        arguments: '-c Release -r linux-x64 -p:version=$(tag)  -o "$(Build.ArtifactStagingDirectory)/linux-x64"' 
     - powershell: move-item $(Build.ArtifactStagingDirectory)/linux-x64/Rnwood.Smtp4dev.zip $(Build.ArtifactStagingDirectory)/linux-x64/Rnwood.Smtp4dev-linux-x64-$(tag).zip
       displayName: Rename artifact        
     - publish: $(Build.ArtifactStagingDirectory)/linux-x64
-      artifact: linux-x64       
+      artifact: linux-x64  
+      
     - task: DotNetCoreCLI@2
-      displayName: Build .NET Core - osx-x64
+      displayName: Build .NET Core - linux-musl-x64
       inputs:
         command: publish
         projects: Rnwood.Smtp4dev/Rnwood.Smtp4dev.csproj
-        arguments: '-c Release -r osx-x64 -p:version=$(Build.BuildNumber)  -o "$(Build.ArtifactStagingDirectory)/osx-x64"' 
-    - powershell: move-item $(Build.ArtifactStagingDirectory)/osx-x64/Rnwood.Smtp4dev.zip $(Build.ArtifactStagingDirectory)/osx-x64/Rnwood.Smtp4dev-osx-x64-$(tag).zip
+        arguments: '-c Release -r linux-musl-x64 -p:version=$(tag)  -o "$(Build.ArtifactStagingDirectory)/linux-musl-x64"' 
+    - powershell: move-item $(Build.ArtifactStagingDirectory)/linux-musl-x64/Rnwood.Smtp4dev.zip $(Build.ArtifactStagingDirectory)/linux-musl-x64/Rnwood.Smtp4dev-linux-musl-x64-$(tag).zip
       displayName: Rename artifact        
-    - publish: $(Build.ArtifactStagingDirectory)/osx-x64
-      artifact: osx-x64   
+    - publish: $(Build.ArtifactStagingDirectory)/linux-musl-x64
+      artifact: linux-musl-x64            
+      
+    # - task: DotNetCoreCLI@2
+    #   displayName: Build .NET Core - osx-x64
+    #   inputs:
+    #     command: publish
+    #     projects: Rnwood.Smtp4dev/Rnwood.Smtp4dev.csproj
+    #     arguments: '-c Release -r osx-x64 -p:version=$(tag)  -o "$(Build.ArtifactStagingDirectory)/osx-x64"' 
+    # - powershell: move-item $(Build.ArtifactStagingDirectory)/osx-x64/Rnwood.Smtp4dev.zip $(Build.ArtifactStagingDirectory)/osx-x64/Rnwood.Smtp4dev-osx-x64-$(tag).zip
+    #   displayName: Rename artifact        
+    # - publish: $(Build.ArtifactStagingDirectory)/osx-x64
+    #   artifact: osx-x64   
     - task: DotNetCoreCLI@2
       displayName: Build .NET Core - win-arm
       inputs:
         command: publish
         projects: Rnwood.Smtp4dev/Rnwood.Smtp4dev.csproj
-        arguments: '-c Release -r win-arm -p:version=$(Build.BuildNumber)  -o "$(Build.ArtifactStagingDirectory)/win-arm"' 
+        arguments: '-c Release -r win-arm -p:version=$(tag)  -o "$(Build.ArtifactStagingDirectory)/win-arm"' 
     - powershell: move-item $(Build.ArtifactStagingDirectory)/win-arm/Rnwood.Smtp4dev.zip $(Build.ArtifactStagingDirectory)/win-arm/Rnwood.Smtp4dev-win-arm-$(tag).zip
       displayName: Rename artifact
     - publish: $(Build.ArtifactStagingDirectory)/win-arm
@@ -95,12 +132,11 @@ stages:
       inputs:
         command: publish
         projects: Rnwood.Smtp4dev/Rnwood.Smtp4dev.csproj
-        arguments: '-c Release -r linux-arm -p:version=$(Build.BuildNumber)  -o "$(Build.ArtifactStagingDirectory)/linux-arm"' 
-    - powershell: move-item $(Build.ArtifactStagingDirectory)/linux-arm/Rnwood.Smtp4dev.zip $(Build.ArtifactStagingDirectory)/linux-arm/Rnwood.Smtp4dev-noruntime-$(tag).zip
+        arguments: '-c Release -r linux-arm -p:version=$(tag)  -o "$(Build.ArtifactStagingDirectory)/linux-arm"' 
+    - powershell: move-item $(Build.ArtifactStagingDirectory)/linux-arm/Rnwood.Smtp4dev.zip $(Build.ArtifactStagingDirectory)/linux-arm/Rnwood.Smtp4dev-arm-$(tag).zip
       displayName: Rename artifact
     - publish: $(Build.ArtifactStagingDirectory)/linux-arm
       artifact: linux-arm     
-
   - job: DockerBuildLinux
     displayName: DockerBuild - Linux
     pool:
@@ -111,62 +147,39 @@ stages:
       inputs:
         command: build
         dockerfile: '**/Dockerfile.linux'
-        arguments: '--build-arg version=$(Build.BuildNumber) -t $(docker_repo):linux-amd64-$(Build.BuildNumber)'
+        arguments: '--build-arg version=$(tag) -t $(docker_repo):linux-amd64-$(tag)'
     - task: Docker@2
       displayName: Push image
+      condition: or(variables['isreleasebuild'], variables['iscibuild'])
       inputs:
         containerRegistry: $(docker_registry)
         repository: $(docker_repo)
         command: push
         tags: |
-          linux-amd64-$(Build.BuildNumber)       
+          linux-amd64-$(tag)       
   - job: DockerBuildWindows
     displayName: DockerBuild - Windows
     pool:
       vmImage: 'windows-2019'
     steps:
-    - task: PowerShell@2
-      displayName: Pull images to use as cache
-      inputs:
-        targetType: inline
-        ignoreLASTEXITCODE: true
-        script: |
-          $ErrorActionPreference="Continue"
-          (
-            (start-job { docker pull $(docker_repo):windows-amd64-$(docker_tag_suffix)-buildcache-downloadnodejs }),
-            (start-job { docker pull $(docker_repo):windows-amd64-$(docker_tag_suffix)-buildcache-build })
-          ) | receive-job -wait
-    - task: Docker@2
-      displayName: Build cache image - downloadnodejs
-      inputs:
-        command: build  
-        dockerfile: '**/Dockerfile.windows'
-        arguments: '--cache-from $(docker_repo):windows-amd64-$(docker_tag_suffix)-buildcache-downloadnodejs --build-arg version=$(Build.BuildNumber) --target downloadnodejs -t $(docker_repo):windows-amd64-$(docker_tag_suffix)-buildcache-downloadnodejs'
-    - task: Docker@2
-      displayName: Build cache image - build
-      inputs:
-        command: build  
-        dockerfile: '**/Dockerfile.windows'
-        arguments: '--cache-from $(docker_repo):windows-amd64-$(docker_tag_suffix)-buildcache-build --cache-from $(docker_repo):windows-amd64-$(docker_tag_suffix)-buildcache-downloadnodejs --build-arg version=$(Build.BuildNumber) --target build -t $(docker_repo):windows-amd64-$(docker_tag_suffix)-buildcache-build'                
     - task: Docker@2
       displayName: Build image
       inputs:
         command: build  
         dockerfile: '**/Dockerfile.windows'
-        arguments: '--cache-from $(docker_repo):windows-amd64-$(docker_tag_suffix)-buildcache-build --cache-from $(docker_repo):windows-amd64-$(docker_tag_suffix)-buildcache-downloadnodejs --build-arg version=$(Build.BuildNumber) -t $(docker_repo):windows-amd64-$(Build.BuildNumber)'
+        arguments: '--build-arg version=$(tag) -t $(docker_repo):windows-amd64-$(tag)'
     - task: Docker@2
       displayName: Push image
+      condition: or(variables['isreleasebuild'], variables['iscibuild'])
       inputs:
         containerRegistry: $(docker_registry)
         repository: $(docker_repo)        
         command: push
         tags: |
-          windows-amd64-$(Build.BuildNumber)
-          windows-amd64-$(docker_tag_suffix)-buildcache-downloadnodejs
-          windows-amd64-$(docker_tag_suffix)-buildcache-build
-
+          windows-amd64-$(tag)
   - job: DockerManifest
     displayName: Docker Create Manifest
+    condition: or(variables['isreleasebuild'], variables['iscibuild'])
     dependsOn:
     - DockerBuildLinux
     - DockerBuildWindows
@@ -186,11 +199,12 @@ stages:
       inputs:
         targetType: inline
         script: |
-          docker manifest create $(docker_repo):$(Build.BuildNumber) $(docker_repo):windows-amd64-$(Build.BuildNumber) $(docker_repo):linux-amd64-$(Build.BuildNumber)
-          docker manifest push $(docker_repo):$(Build.BuildNumber)         
+          docker manifest create $(docker_repo):$(tag) $(docker_repo):windows-amd64-$(tag) $(docker_repo):linux-amd64-$(tag)
+          docker manifest push $(docker_repo):$(tag)         
 
 - stage: Test
   displayName: Test
+  condition:  succeeded()
   jobs:
   - job: TestOnWindows
     displayName: Test - Windows
@@ -236,7 +250,7 @@ stages:
         command: test
   
 - stage: Release
-  condition:  and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/master'))
+  condition:  and(succeeded(), or(variables['isreleasebuild'], variables['iscibuild']))
   displayName: Release
   jobs:  
   - job: Release
@@ -264,9 +278,15 @@ stages:
         tag: $(tag)
         tagSource: userSpecifiedTag
         isDraft: false
-        isPreRelease: true
-        changeLogCompareToRelease: lastNonDraftRelease 
-        assets: $(Build.ArtifactStagingDirectory)/**/*
+
+        ${{ if variables['isreleasebuild'] }}:
+          isPreRelease: false
+          changeLogCompareToRelease: lastFullRelease
+        ${{ if not(variables['isreleasebuild']) }}:
+          isPreRelease: true
+          changeLogCompareToRelease: lastNonDraftRelease
+         
+        assets: $(Build.ArtifactStagingDirectory)/**/*.zip
 
   - job: DockerReleaseTagLinux
     displayName: Docker Release Tag - Linux
@@ -287,11 +307,12 @@ stages:
       inputs:
         targetType: inline
         script: |
-          docker pull $(docker_repo):linux-amd64-$(Build.BuildNumber)
-          docker tag $(docker_repo):linux-amd64-$(Build.BuildNumber) $(docker_repo):linux-amd64-$(docker_tag_suffix)
-          docker push $(docker_repo):linux-amd64-$(docker_tag_suffix)
-          docker tag $(docker_repo):linux-amd64-$(Build.BuildNumber) $(docker_repo):linux-amd64-latest
-          docker push $(docker_repo):linux-amd64-latest
+          docker pull $(docker_repo):linux-amd64-$(tag)
+
+          ("$(docker_tags)".Split(" ", [StringSplitOptions]::RemoveEmptyEntries)) | foreach-object {
+            docker tag $(docker_repo):linux-amd64-$(tag) $(docker_repo):linux-amd64-$_
+            docker push $(docker_repo):linux-amd64-$_
+          }
 
   - job: DockerRelease
     displayName: Docker Release
@@ -303,7 +324,7 @@ stages:
     steps:
     - checkout: none
     - task: Docker@2
-      displayName: Login.
+      displayName: Login
       inputs:
         containerRegistry: $(docker_registry)
         repository: $(docker_repo)        
@@ -313,12 +334,19 @@ stages:
       inputs:
         targetType: inline
         script: |
-          docker pull $(docker_repo):windows-amd64-$(Build.BuildNumber)
-          docker tag $(docker_repo):windows-amd64-$(Build.BuildNumber) $(docker_repo):windows-amd64-$(docker_tag_suffix)
-          docker push $(docker_repo):windows-amd64-$(docker_tag_suffix)
-          docker tag $(docker_repo):windows-amd64-$(Build.BuildNumber) $(docker_repo):windows-amd64-latest
-          docker push $(docker_repo):windows-amd64-latest
-          docker manifest create $(docker_repo):$(docker_tag_suffix) $(docker_repo):windows-amd64-$(docker_tag_suffix) $(docker_repo):linux-amd64-$(docker_tag_suffix)
-          docker manifest push $(docker_repo):$(docker_tag_suffix)
-          docker manifest create $(docker_repo):latest $(docker_repo):windows-amd64-latest $(docker_repo):linux-amd64-latest
-          docker manifest push $(docker_repo):latest
+          docker pull $(docker_repo):windows-amd64-$(tag)
+
+          ("$(docker_tags)".Split(" ", [StringSplitOptions]::RemoveEmptyEntries)) | foreach-object {
+            docker tag $(docker_repo):windows-amd64-$(tag) $(docker_repo):windows-amd64-$_
+            docker push $(docker_repo):windows-amd64-$_
+          }
+          
+          docker manifest create $(docker_repo):$(tag) $(docker_repo):windows-amd64-$(tag) $(docker_repo):linux-amd64-$(tag)
+          docker manifest push $(docker_repo):$(tag)
+
+          ("$(docker_tags)".Split(" ", [StringSplitOptions]::RemoveEmptyEntries)) | foreach-object {
+            docker manifest create $(docker_repo):$_ $(docker_repo):windows-amd64-$_ $(docker_repo):linux-amd64-$_
+            docker manifest push $(docker_repo):$_
+          }
+
+

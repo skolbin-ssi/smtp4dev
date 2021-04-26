@@ -1,8 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
-using System.Linq;
-using System.Threading.Tasks;
 
 namespace Rnwood.Smtp4dev.DbModel
 {
@@ -11,11 +8,12 @@ namespace Rnwood.Smtp4dev.DbModel
 
         public Message()
         {
-
         }
 
         [Key]
         public Guid Id { get; set; }
+
+        public long ImapUid { get; internal set; }
 
         public string From { get; set; }
         public string To { get; set; }
@@ -31,5 +29,8 @@ namespace Rnwood.Smtp4dev.DbModel
         public int AttachmentCount { get; set; }
 
         public bool IsUnread { get; set; }
+        public string RelayError { get; internal set; }
+        
+        public bool SecureConnection { get; set; }
     }
 }
